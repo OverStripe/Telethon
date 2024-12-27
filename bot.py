@@ -10,10 +10,10 @@ import requests
 # CONFIGURATION
 # -------------------------------
 
-AUTHORIZED_USER = "7222795580"  # Only this phone number can approve users
+AUTHORIZED_USER = "7222795580"  # Only this user can manage approvals
 APPROVED_USERS_FILE = "approved_users.txt"
-BOT_TOKEN = "8022539978:AAFCZWIxEMrN5RLIs1inv0EmSsZi9UBs1xU"
-ADMIN_CHAT_ID = "7222795580"  # Chat ID to notify when the bot starts
+BOT_TOKEN = "8022539978:AAH_95yhC1RxQS8elCyvYsjdea01ZfUwQKs"
+ADMIN_CHAT_ID = "7222795580"  # Chat ID to notify admin on startup
 
 # -------------------------------
 # UTILITY FUNCTIONS
@@ -21,12 +21,12 @@ ADMIN_CHAT_ID = "7222795580"  # Chat ID to notify when the bot starts
 
 def display_step(step_message):
     """Stylish step display."""
-    print(f"\n❖ {step_message}\n" + "-" * len(step_message))
+    print(f"\n🌟 {step_message}\n" + "━" * len(step_message))
 
 
 def cool_input(prompt):
     """Stylish input prompt."""
-    return input(f"❖ {prompt}: ").strip()
+    return input(f"🟢 {prompt}: ").strip()
 
 
 def load_approved_users():
@@ -42,10 +42,10 @@ def approve_user(user_id):
     """Approve a user."""
     approved_users = load_approved_users()
     if user_id in approved_users:
-        return f"❖ User {user_id} is already approved."
+        return f"✅ User {user_id} is already approved."
     with open(APPROVED_USERS_FILE, 'a') as file:
         file.write(f"{user_id}\n")
-    return f"❖ User {user_id} approved successfully."
+    return f"✅ User {user_id} approved successfully."
 
 
 def is_user_approved(user_id):
@@ -53,13 +53,6 @@ def is_user_approved(user_id):
     approved_users = load_approved_users()
     return user_id in approved_users
 
-
-def authorize_user():
-    """Authorize the user before proceeding."""
-    phone_number = cool_input("Enter your phone number for authorization (with country code)")
-    if phone_number != AUTHORIZED_USER and not is_user_approved(phone_number):
-        print("❖ [Error] You are not authorized. Please contact the admin: 7222795580")
-        exit()
 
 # -------------------------------
 # SESSION GENERATION FUNCTIONS
@@ -74,68 +67,42 @@ def generate_user_session(api_id, api_hash, phone_number):
         client.connect()
         
         if not client.is_user_authorized():
-            print(f"❖ Sending OTP to {phone_number}...")
+            print(f"📲 Sending OTP to {phone_number}...")
             client.send_code_request(phone_number)
             
-            otp_code = cool_input(f"Enter OTP for {phone_number}")
+            otp_code = cool_input(f"🔑 Enter OTP for {phone_number}")
             try:
                 client.sign_in(phone_number, otp_code)
             except SessionPasswordNeededError:
-                password = cool_input("Enter your Two-Step Verification password")
+                password = cool_input("🔒 Enter your Two-Step Verification password")
                 client.sign_in(password=password)
         
         user = client.get_me()
-        print(f"❖ Session for {phone_number} created successfully! (@{user.username if user.username else user.first_name})")
+        print(f"✅ Session for {phone_number} created successfully! (@{user.username if user.username else user.first_name})")
         client.disconnect()
         return True
     
     except Exception as e:
-        print(f"❖ [Error] Failed to create session for {phone_number}: {e}")
+        print(f"❌ Failed to create session for {phone_number}: {e}")
         return False
 
 
-def generate_bot_session(bot_token):
-    """Generate a single bot session."""
-    session_name = f"bot_session_{bot_token.split(':')[0]}"
-    client = TelegramClient(session_name, api_id=0, api_hash='')
+def bulk_generate_user_sessions(api_id, api_hash, file_path):
+    """Generate multiple user sessions."""
+    if not os.path.exists(file_path):
+        return "❌ [Error] File not found. Please check the path."
     
-    try:
-        client.start(bot_token=bot_token)
-        print(f"❖ Bot session created successfully for token: {bot_token}")
-        client.disconnect()
-        return True
-    
-    except Exception as e:
-        print(f"❖ [Error] Failed to create bot session: {e}")
-        return False
-
-
-# -------------------------------
-# BULK SESSION FUNCTIONS
-# -------------------------------
-
-def bulk_generate_user_sessions():
-    display_step("Bulk User Session Generation")
-    api_id = cool_input("Enter your API ID")
-    api_hash = cool_input("Enter your API HASH")
-    
-    phone_numbers_file = cool_input("Enter the path to your phone numbers file (one per line)")
-    
-    if not os.path.exists(phone_numbers_file):
-        print("❖ [Error] File not found. Please check the path.")
-        return
-    
-    with open(phone_numbers_file, 'r') as file:
+    with open(file_path, 'r') as file:
         phone_numbers = [line.strip() for line in file.readlines() if line.strip()]
     
     success_count = 0
     for phone_number in phone_numbers:
-        print(f"\n❖ Processing phone number: {phone_number}")
-        if generate_user_session(int(api_id), api_hash, phone_number):
+        print(f"\n📲 Processing phone number: {phone_number}")
+        if generate_user_session(api_id, api_hash, phone_number):
             success_count += 1
         time.sleep(2)
     
-    print(f"\n❖ Bulk User Session Generation Completed: {success_count}/{len(phone_numbers)} sessions created successfully.")
+    return f"✅ Bulk User Session Generation Completed: {success_count}/{len(phone_numbers)} sessions created successfully."
 
 
 # -------------------------------
@@ -144,17 +111,33 @@ def bulk_generate_user_sessions():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command for the bot."""
-    await update.message.reply_text("❖ Welcome to Telegram Session Manager Bot!")
+    await update.message.reply_text(
+        "🚀 **Welcome to Telegram Session Manager Bot!**\n"
+        "Type `/help` to see all commands."
+    )
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """List all commands."""
+    commands = """
+📚 **Available Commands:**
+🟢 `/start` → Start the bot.
+🟢 `/ap <user_id>` → Approve a user (Admin Only).
+🟢 `/la` → List approved users (Admin Only).
+🟢 `/su <api_id> <api_hash> <phone>` → Single User Session.
+🟢 `/bu <api_id> <api_hash> <file_path>` → Bulk User Sessions.
+"""
+    await update.message.reply_text(commands)
 
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Approve a user via bot."""
     if str(update.effective_user.id) != AUTHORIZED_USER:
-        await update.message.reply_text("❖ [Error] You are not authorized to approve users.")
+        await update.message.reply_text("❌ [Error] You are not authorized to approve users.")
         return
     
     if len(context.args) != 1:
-        await update.message.reply_text("❖ Usage: /approve <user_id>")
+        await update.message.reply_text("❌ Usage: /ap <user_id>")
         return
     
     user_id = context.args[0]
@@ -166,32 +149,63 @@ async def list_approved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List all approved users."""
     users = load_approved_users()
     if users:
-        await update.message.reply_text("❖ Approved Users:\n" + "\n".join(users))
+        await update.message.reply_text("✅ Approved Users:\n" + "\n".join(users))
     else:
-        await update.message.reply_text("❖ No approved users found.")
+        await update.message.reply_text("❌ No approved users found.")
 
+
+async def single_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generate single user session."""
+    if len(context.args) != 3:
+        await update.message.reply_text("❌ Usage: /su <api_id> <api_hash> <phone>")
+        return
+    
+    api_id, api_hash, phone = context.args
+    result = generate_user_session(api_id, api_hash, phone)
+    await update.message.reply_text("✅ Session generated successfully!" if result else "❌ Session generation failed.")
+
+
+async def bulk_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generate bulk user sessions."""
+    if len(context.args) != 3:
+        await update.message.reply_text("❌ Usage: /bu <api_id> <api_hash> <file_path>")
+        return
+    
+    api_id, api_hash, file_path = context.args
+    result = bulk_generate_user_sessions(api_id, api_hash, file_path)
+    await update.message.reply_text(result)
+
+
+# -------------------------------
+# NOTIFICATIONS
+# -------------------------------
 
 def send_start_notification():
-    """Notify the admin when the bot starts."""
     try:
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": ADMIN_CHAT_ID, "text": "❖ Telegram Session Manager Bot started successfully!"}
+            data={"chat_id": ADMIN_CHAT_ID, "text": "✅ Bot started successfully!"}
         )
     except Exception as e:
-        print(f"❖ [Error] Failed to send start notification: {e}")
+        print(f"❌ Failed to send start notification: {e}")
 
 
 def run_bot():
-    """Run the Telegram Bot."""
     send_start_notification()
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("approve", approve))
-    application.add_handler(CommandHandler("list_approved", list_approved))
-    print("❖ Bot is running... Use commands like /approve, /list_approved.")
-    application.run_polling()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("ap", approve))
+    app.add_handler(CommandHandler("la", list_approved))
+    app.add_handler(CommandHandler("su", single_user))
+    app.add_handler(CommandHandler("bu", bulk_user))
+    print("🚀 Bot is running with enhanced UI!")
+    app.run_polling()
 
+
+# -------------------------------
+# MAIN
+# -------------------------------
 
 if __name__ == '__main__':
     run_bot()
